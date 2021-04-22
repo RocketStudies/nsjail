@@ -47,7 +47,7 @@ static bool createCgroup(const std::string& cgroup_path, pid_t pid) {
 }
 
 static bool writeToCgroup(
-    const std::string& cgroup_path, const std::string& value, const std::string& what) {
+	const std::string& cgroup_path, const std::string& value, const std::string& what) {
 	LOG_D("Setting '%s' to '%s'", cgroup_path.c_str(), value.c_str());
 	if (!util::writeBufToFile(
 		cgroup_path.c_str(), value.c_str(), value.length(), O_WRONLY | O_CLOEXEC)) {
@@ -55,6 +55,22 @@ static bool writeToCgroup(
 		return false;
 	}
 	return true;
+}
+
+static void recordUsage(const std::string& cgroup_path, const std::string& what, long long* dst) {
+	std::string resource_path = cgroup_path + "/" + what;
+	const int to_read = 1023;
+	char* buf = new char[to_read + 1];
+	ssize_t res = util::readFromFile(resource_path.c_str(), buf, to_read);
+	if (res == -1) {
+		LOG_W("Could not read from %s", resource_path.c_str());
+		return;
+	}
+	buf[res] = 0;
+	if (sscanf(buf, "%lld", dst) != 1) {
+		LOG_W("Read usage of %s unsuccessful, found %s", resource_path.c_str(), buf);
+		return;
+	}
 }
 
 static bool addPidToTaskList(const std::string& cgroup_path, pid_t pid) {
@@ -65,23 +81,25 @@ static bool addPidToTaskList(const std::string& cgroup_path, pid_t pid) {
 }
 
 static bool initNsFromParentMem(nsjconf_t* nsjconf, pid_t pid) {
-	if (nsjconf->cgroup_mem_max == (size_t)0) {
+	if (nsjconf->cgroup_mem_max == (size_t)0 && !nsjconf->report_usage) {
 		return true;
 	}
 
 	std::string mem_cgroup_path = nsjconf->cgroup_mem_mount + '/' + nsjconf->cgroup_mem_parent +
-				      "/NSJAIL." + std::to_string(pid);
+		"/NSJAIL." + std::to_string(pid);
 	RETURN_ON_FAILURE(createCgroup(mem_cgroup_path, pid));
 
-	std::string mem_max_str = std::to_string(nsjconf->cgroup_mem_max);
-	RETURN_ON_FAILURE(writeToCgroup(
-	    mem_cgroup_path + "/memory.limit_in_bytes", mem_max_str, "memory cgroup max limit"));
+	if (nsjconf->cgroup_mem_max != (size_t)0) {
+		std::string mem_max_str = std::to_string(nsjconf->cgroup_mem_max);
+		RETURN_ON_FAILURE(writeToCgroup(
+			mem_cgroup_path + "/memory.limit_in_bytes", mem_max_str, "memory cgroup max limit"));
 
-	/*
-	 * Use OOM-killer instead of making processes hang/sleep
-	 */
-	RETURN_ON_FAILURE(writeToCgroup(
-	    mem_cgroup_path + "/memory.oom_control", "0", "memory cgroup oom control"));
+/*
+ * Use OOM-killer instead of making processes hang/sleep
+ */
+		RETURN_ON_FAILURE(writeToCgroup(
+			mem_cgroup_path + "/memory.oom_control", "0", "memory cgroup oom control"));
+	}
 
 	return addPidToTaskList(mem_cgroup_path, pid);
 }
@@ -92,13 +110,13 @@ static bool initNsFromParentPids(nsjconf_t* nsjconf, pid_t pid) {
 	}
 
 	std::string pids_cgroup_path = nsjconf->cgroup_pids_mount + '/' +
-				       nsjconf->cgroup_pids_parent + "/NSJAIL." +
-				       std::to_string(pid);
+		nsjconf->cgroup_pids_parent + "/NSJAIL." +
+		std::to_string(pid);
 	RETURN_ON_FAILURE(createCgroup(pids_cgroup_path, pid));
 
 	std::string pids_max_str = std::to_string(nsjconf->cgroup_pids_max);
 	RETURN_ON_FAILURE(
-	    writeToCgroup(pids_cgroup_path + "/pids.max", pids_max_str, "pids cgroup max limit"));
+		writeToCgroup(pids_cgroup_path + "/pids.max", pids_max_str, "pids cgroup max limit"));
 
 	return addPidToTaskList(pids_cgroup_path, pid);
 }
@@ -109,8 +127,8 @@ static bool initNsFromParentNetCls(nsjconf_t* nsjconf, pid_t pid) {
 	}
 
 	std::string net_cls_cgroup_path = nsjconf->cgroup_net_cls_mount + '/' +
-					  nsjconf->cgroup_net_cls_parent + "/NSJAIL." +
-					  std::to_string(pid);
+		nsjconf->cgroup_net_cls_parent + "/NSJAIL." +
+		std::to_string(pid);
 	RETURN_ON_FAILURE(createCgroup(net_cls_cgroup_path, pid));
 
 	std::string net_cls_classid_str;
@@ -120,26 +138,28 @@ static bool initNsFromParentNetCls(nsjconf_t* nsjconf, pid_t pid) {
 		net_cls_classid_str = ss.str();
 	}
 	RETURN_ON_FAILURE(writeToCgroup(net_cls_cgroup_path + "/net_cls.classid",
-	    net_cls_classid_str, "net_cls cgroup classid"));
+									net_cls_classid_str, "net_cls cgroup classid"));
 
 	return addPidToTaskList(net_cls_cgroup_path, pid);
 }
 
 static bool initNsFromParentCpu(nsjconf_t* nsjconf, pid_t pid) {
-	if (nsjconf->cgroup_cpu_ms_per_sec == 0U) {
+	if (nsjconf->cgroup_cpu_ms_per_sec == 0U && !nsjconf->report_usage) {
 		return true;
 	}
 
 	std::string cpu_cgroup_path = nsjconf->cgroup_cpu_mount + '/' + nsjconf->cgroup_cpu_parent +
-				      "/NSJAIL." + std::to_string(pid);
+		"/NSJAIL." + std::to_string(pid);
 	RETURN_ON_FAILURE(createCgroup(cpu_cgroup_path, pid));
 
-	std::string cpu_ms_per_sec_str = std::to_string(nsjconf->cgroup_cpu_ms_per_sec * 1000U);
-	RETURN_ON_FAILURE(
-	    writeToCgroup(cpu_cgroup_path + "/cpu.cfs_quota_us", cpu_ms_per_sec_str, "cpu quota"));
+	if (nsjconf->cgroup_cpu_ms_per_sec != 0U) {
+		std::string cpu_ms_per_sec_str = std::to_string(nsjconf->cgroup_cpu_ms_per_sec * 1000U);
+		RETURN_ON_FAILURE(
+			writeToCgroup(cpu_cgroup_path + "/cpu.cfs_quota_us", cpu_ms_per_sec_str, "cpu quota"));
 
-	RETURN_ON_FAILURE(
-	    writeToCgroup(cpu_cgroup_path + "/cpu.cfs_period_us", "1000000", "cpu period"));
+		RETURN_ON_FAILURE(
+			writeToCgroup(cpu_cgroup_path + "/cpu.cfs_period_us", "1000000", "cpu period"));
+	}
 
 	return addPidToTaskList(cpu_cgroup_path, pid);
 }
@@ -159,28 +179,35 @@ static void removeCgroup(const std::string& cgroup_path) {
 }
 
 void finishFromParent(nsjconf_t* nsjconf, pid_t pid) {
-	if (nsjconf->cgroup_mem_max != (size_t)0) {
+	if (nsjconf->cgroup_mem_max != (size_t)0 || nsjconf->report_usage) {
 		std::string mem_cgroup_path = nsjconf->cgroup_mem_mount + '/' +
-					      nsjconf->cgroup_mem_parent + "/NSJAIL." +
-					      std::to_string(pid);
+			nsjconf->cgroup_mem_parent + "/NSJAIL." +
+			std::to_string(pid);
+		if (!nsjconf->report_usage) {
+			recordUsage(mem_cgroup_path, "memory.max_usage_in_bytes", &nsjconf->memory_usage);
+		}
 		removeCgroup(mem_cgroup_path);
 	}
 	if (nsjconf->cgroup_pids_max != 0U) {
 		std::string pids_cgroup_path = nsjconf->cgroup_pids_mount + '/' +
-					       nsjconf->cgroup_pids_parent + "/NSJAIL." +
-					       std::to_string(pid);
+			nsjconf->cgroup_pids_parent + "/NSJAIL." +
+			std::to_string(pid);
 		removeCgroup(pids_cgroup_path);
 	}
 	if (nsjconf->cgroup_net_cls_classid != 0U) {
 		std::string net_cls_cgroup_path = nsjconf->cgroup_net_cls_mount + '/' +
-						  nsjconf->cgroup_net_cls_parent + "/NSJAIL." +
-						  std::to_string(pid);
+			nsjconf->cgroup_net_cls_parent + "/NSJAIL." +
+			std::to_string(pid);
 		removeCgroup(net_cls_cgroup_path);
 	}
-	if (nsjconf->cgroup_cpu_ms_per_sec != 0U) {
+	if (nsjconf->cgroup_cpu_ms_per_sec != 0U || nsjconf->report_usage) {
 		std::string cpu_cgroup_path = nsjconf->cgroup_cpu_mount + '/' +
-					      nsjconf->cgroup_cpu_parent + "/NSJAIL." +
-					      std::to_string(pid);
+			nsjconf->cgroup_cpu_parent + "/NSJAIL." +
+			std::to_string(pid);
+		if (nsjconf->report_usage) {
+			recordUsage(cpu_cgroup_path, "cpuacct.usage_user", &nsjconf->user_cpu_usage);
+			recordUsage(cpu_cgroup_path, "cpuacct.usage_sys", &nsjconf->system_cpu_usage);
+		}
 		removeCgroup(cpu_cgroup_path);
 	}
 }

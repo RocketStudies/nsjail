@@ -99,16 +99,16 @@ static bool setTimer(nsjconf_t* nsjconf) {
 	}
 
 	struct itimerval it = {
-	    .it_interval =
-		{
-		    .tv_sec = 1,
-		    .tv_usec = 0,
-		},
-	    .it_value =
-		{
-		    .tv_sec = 1,
-		    .tv_usec = 0,
-		},
+		.it_interval =
+			{
+				.tv_sec = 1,
+				.tv_usec = 0,
+			},
+		.it_value =
+			{
+				.tv_sec = 1,
+				.tv_usec = 0,
+			},
 	};
 	if (setitimer(ITIMER_REAL, &it, NULL) == -1) {
 		PLOG_E("setitimer(ITIMER_REAL)");
@@ -122,26 +122,26 @@ static bool pipeTraffic(nsjconf_t* nsjconf, int listenfd) {
 	fds.reserve(nsjconf->pipes.size() * 3 + 1);
 	for (const auto& p : nsjconf->pipes) {
 		fds.push_back({
-		    .fd = p.sock_fd,
-		    .events = POLLIN | POLLOUT,
-		    .revents = 0,
-		});
+						  .fd = p.sock_fd,
+						  .events = POLLIN | POLLOUT,
+						  .revents = 0,
+					  });
 		fds.push_back({
-		    .fd = p.pipe_in,
-		    .events = POLLOUT,
-		    .revents = 0,
-		});
+						  .fd = p.pipe_in,
+						  .events = POLLOUT,
+						  .revents = 0,
+					  });
 		fds.push_back({
-		    .fd = p.pipe_out,
-		    .events = POLLIN,
-		    .revents = 0,
-		});
+						  .fd = p.pipe_out,
+						  .events = POLLIN,
+						  .revents = 0,
+					  });
 	}
 	fds.push_back({
-	    .fd = listenfd,
-	    .events = POLLIN,
-	    .revents = 0,
-	});
+					  .fd = listenfd,
+					  .events = POLLIN,
+					  .revents = 0,
+				  });
 	LOG_D("Waiting for fd activity");
 	while (poll(fds.data(), fds.size(), -1) > 0) {
 		if (sigFatal > 0 || showProc) {
@@ -166,22 +166,22 @@ static bool pipeTraffic(nsjconf_t* nsjconf, int listenfd) {
 			const char* direction;
 			bool closed = false;
 			std::tuple<int, int, const char*> direction_map[] = {
-			    std::make_tuple(i, i + 1, "in"),
-			    std::make_tuple(i + 2, i, "out"),
+				std::make_tuple(i, i + 1, "in"),
+				std::make_tuple(i + 2, i, "out"),
 			};
 			for (const auto& entry : direction_map) {
 				std::tie(in, out, direction) = entry;
 				bool in_ready = (fds[in].events & POLLIN) == 0 ||
-						(fds[in].revents & POLLIN) == POLLIN;
+					(fds[in].revents & POLLIN) == POLLIN;
 				bool out_ready = (fds[out].events & POLLOUT) == 0 ||
-						 (fds[out].revents & POLLOUT) == POLLOUT;
+					(fds[out].revents & POLLOUT) == POLLOUT;
 				if (in_ready && out_ready) {
 					LOG_D("#%zu piping data %s", pipe_no, direction);
 					ssize_t rv = splice(fds[in].fd, nullptr, fds[out].fd,
-					    nullptr, 4096, SPLICE_F_NONBLOCK);
+										nullptr, 4096, SPLICE_F_NONBLOCK);
 					if (rv == -1 && errno != EAGAIN) {
 						PLOG_E("splice fd pair #%zu {%d, %d}\n", pipe_no,
-						    fds[in].fd, fds[out].fd);
+							   fds[in].fd, fds[out].fd);
 					}
 					if (rv == 0) {
 						closed = true;
@@ -190,7 +190,7 @@ static bool pipeTraffic(nsjconf_t* nsjconf, int listenfd) {
 					fds[out].events |= POLLOUT;
 				}
 				if ((fds[in].revents & (POLLERR | POLLHUP)) != 0 ||
-				    (fds[out].revents & (POLLERR | POLLHUP)) != 0) {
+					(fds[out].revents & (POLLERR | POLLHUP)) != 0) {
 					closed = true;
 				}
 			}
@@ -211,7 +211,7 @@ static bool pipeTraffic(nsjconf_t* nsjconf, int listenfd) {
 		}
 	}
 	nsjconf->pipes.erase(std::remove(nsjconf->pipes.begin(), nsjconf->pipes.end(), pipemap_t{}),
-	    nsjconf->pipes.end());
+						 nsjconf->pipes.end());
 	return false;
 }
 
@@ -242,7 +242,7 @@ static int listenMode(nsjconf_t* nsjconf) {
 				}
 
 				pid_t pid =
-				    subproc::runChild(nsjconf, connfd, in[0], out[1], out[1]);
+					subproc::runChild(nsjconf, connfd, in[0], out[1], out[1]);
 
 				close(in[0]);
 				close(out[1]);
@@ -253,11 +253,11 @@ static int listenMode(nsjconf_t* nsjconf) {
 					close(connfd);
 				} else {
 					nsjconf->pipes.push_back({
-					    .sock_fd = connfd,
-					    .pipe_in = in[1],
-					    .pipe_out = out[0],
-					    .pid = pid,
-					});
+												 .sock_fd = connfd,
+												 .pipe_in = in[1],
+												 .pipe_out = out[0],
+												 .pid = pid,
+											 });
 				}
 			}
 		}
@@ -268,7 +268,7 @@ static int listenMode(nsjconf_t* nsjconf) {
 static int standaloneMode(nsjconf_t* nsjconf) {
 	for (;;) {
 		if (subproc::runChild(nsjconf, /* netfd= */ -1, STDIN_FILENO, STDOUT_FILENO,
-			STDERR_FILENO) == -1) {
+							  STDERR_FILENO) == -1) {
 			LOG_E("Couldn't launch the child process");
 			return 0xff;
 		}
@@ -348,6 +348,11 @@ int main(int argc, char* argv[]) {
 		ret = nsjail::listenMode(nsjconf.get());
 	} else {
 		ret = nsjail::standaloneMode(nsjconf.get());
+		if (nsjconf->report_usage) {
+			LOG_I("[usage] cpu_user %lld", nsjconf->user_cpu_usage);
+			LOG_I("[usage] cpu_system %lld", nsjconf->system_cpu_usage);
+			LOG_I("[usage] memory %lld", nsjconf->memory_usage);
+		}
 	}
 
 	sandbox::closePolicy(nsjconf.get());

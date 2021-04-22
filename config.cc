@@ -281,6 +281,8 @@ static bool configParseInternal(nsjconf_t* nsjconf, const nsjail::NsJailConfig& 
 		nsjconf->use_execveat = njc.exec_bin().exec_fd();
 	}
 
+	nsjconf->report_usage = njc.report_usage();
+
 	return true;
 }
 
