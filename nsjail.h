@@ -124,6 +124,7 @@ struct nsjconf_t {
 	bool clone_newipc;
 	bool clone_newuts;
 	bool clone_newcgroup;
+	bool clone_newtime;
 	enum ns_mode_t mode;
 	bool is_root_rw;
 	bool is_silent;
@@ -139,6 +140,7 @@ struct nsjconf_t {
 	std::string iface_vs_nm;
 	std::string iface_vs_gw;
 	std::string iface_vs_ma;
+	std::string iface_vs_mo;
 	std::string cgroup_mem_mount;
 	std::string cgroup_mem_parent;
 	size_t cgroup_mem_max;

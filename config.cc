@@ -183,6 +183,7 @@ static bool configParseInternal(nsjconf_t* nsjconf, const nsjail::NsJailConfig& 
 	nsjconf->clone_newipc = njc.clone_newipc();
 	nsjconf->clone_newuts = njc.clone_newuts();
 	nsjconf->clone_newcgroup = njc.clone_newcgroup();
+	nsjconf->clone_newtime = njc.clone_newtime();
 
 	for (ssize_t i = 0; i < njc.uidmap_size(); i++) {
 		if (!user::parseId(nsjconf, njc.uidmap(i).inside_id(), njc.uidmap(i).outside_id(),
@@ -266,6 +267,7 @@ static bool configParseInternal(nsjconf_t* nsjconf, const nsjail::NsJailConfig& 
 	nsjconf->iface_vs_nm = njc.macvlan_vs_nm();
 	nsjconf->iface_vs_gw = njc.macvlan_vs_gw();
 	nsjconf->iface_vs_ma = njc.macvlan_vs_ma();
+	nsjconf->iface_vs_mo = njc.macvlan_vs_mo();
 
 	if (njc.has_exec_bin()) {
 		if (njc.exec_bin().has_path()) {
