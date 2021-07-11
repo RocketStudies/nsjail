@@ -672,15 +672,16 @@ std::unique_ptr<nsjconf_t> parseArgs(int argc, char* argv[]) {
 		case 'E':
 			addEnv(nsjconf.get(), optarg);
 			break;
-		case 'u': {
-			std::vector<std::string> subopts = util::strSplit(optarg, ':');
-			std::string i_id = argFromVec(subopts, 0);
-			std::string o_id = argFromVec(subopts, 1);
-			std::string cnt = argFromVec(subopts, 2);
-			size_t count = strtoul(cnt.c_str(), nullptr, 0);
-			if (!user::parseId(nsjconf.get(), i_id, o_id, count, /* is_gid= */ false,
-				/* is_newidmap= */ false)) {
-				return nullptr;
+			case 'u': {
+				std::vector<std::string> subopts = util::strSplit(optarg, ':');
+				std::string i_id = argFromVec(subopts, 0);
+				std::string o_id = argFromVec(subopts, 1);
+				std::string cnt = argFromVec(subopts, 2);
+				size_t count = strtoul(cnt.c_str(), nullptr, 0);
+				if (!user::parseId(nsjconf.get(), i_id, o_id, count, /* is_gid= */ false,
+					/* is_newidmap= */ false)) {
+					return nullptr;
+				}
 			}
 				break;
 			case 'g': {
@@ -718,15 +719,15 @@ std::unique_ptr<nsjconf_t> parseArgs(int argc, char* argv[]) {
 					return nullptr;
 				}
 			}
-		} break;
-		case 'R': {
-			std::vector<std::string> subopts = util::strSplit(optarg, ':');
-			std::string src = argFromVec(subopts, 0);
-			std::string dst = argFromVec(subopts, 1);
-			if (dst.empty()) {
-				dst = src;
-			}
-			if (!mnt::addMountPtTail(nsjconf.get(), src, dst, /* fstype= */ "",
+				break;
+			case 'R': {
+				std::vector<std::string> subopts = util::strSplit(optarg, ':');
+				std::string src = argFromVec(subopts, 0);
+				std::string dst = argFromVec(subopts, 1);
+				if (dst.empty()) {
+					dst = src;
+				}
+				if (!mnt::addMountPtTail(nsjconf.get(), src, dst, /* fstype= */ "",
 				/* options= */ "", MS_BIND | MS_REC | MS_PRIVATE | MS_RDONLY,
 				/* is_dir= */ mnt::NS_DIR_MAYBE, /* is_mandatory= */ true,
 				/* src_env= */ "", /* dst_env= */ "", /* src_content= */ "",
